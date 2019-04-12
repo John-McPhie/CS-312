@@ -14,6 +14,7 @@ import heapq
 import itertools
 import random
 import math
+import system
 
 def reduce(m):
 	#Copy Matrix
@@ -161,7 +162,20 @@ class TSPSolver:
 	'''
 	def greedy( self,time_allowance=60.0 ):
 		cities = self._scenario.getCities()
-		return self.greed_fancy(cities, len(cities), float('inf'))
+		start_time = time.time()
+		s, num_solutions = self.greed_fancy(cities, len(cities), float('inf'))
+		end_time = time.time()
+		results = {}
+		results['cost'] = s.cost
+		results['time'] = end_time - start_time
+		results['count'] = num_solutions
+		results['soln'] = s
+		results['max'] = None
+		results['total'] = None
+		results['pruned'] = None
+		system.notify("Done", "Greedy")
+		return results
+
 
 	''' <summary>
 		This is the entry point for the branch-and-bound algorithm that you will implement
@@ -179,9 +193,9 @@ class TSPSolver:
 		pruned = 0
 		max_q = 0
 		cities = self._scenario.getCities()
+		start_time = time.time()
 		default = self.defaultRandomTour()
 		BSSF = default['cost']
-		start_time = time.time()
 
 		#Initialize Cost Matrix
 		num_cities = len(cities)
@@ -221,6 +235,7 @@ class TSPSolver:
 
 		end_time = time.time()
 		if solution is None:#Initial BSSF was the best.
+			system.notify("Timed Out")
 			return default
 		else:#Display results
 			bssf = TSPSolution(solution.path)
@@ -232,6 +247,7 @@ class TSPSolver:
 			results['max'] = max_q
 			results['total'] = num_states
 			results['pruned'] = pruned + len(nodes) #len(nodes): not dequeued
+			system.notify("Done", "Branch and Bound")
 			return results
 
 	''' <summary>
@@ -250,7 +266,7 @@ class TSPSolver:
 
 		start_time = time.time()
 		# s = self.defaultRandomTour()["soln"]#initial greedy?
-		s = self.greedy(time_allowance)
+		s = self.greedy(time_allowance)['soln']
 		while T > 0 and time.time() - start_time < time_allowance:
 			route = s.route.copy()
 			#randomly choose a solution in the neighborhood.
@@ -270,9 +286,10 @@ class TSPSolver:
 					probability = math.exp(-diff/T)
 					if probability >= random.random():
 						s = neighbor
-				T = (T * .99) - .01 #I just experimented with this until is got better...
+				T = T * .99 - .001 #I just experimented with this until is got better...
 
 		end_time = time.time()
+		system.notify("Done", "Fancy")
 		results = {}
 		results['cost'] = s.cost
 		results['time'] = end_time - start_time
@@ -284,23 +301,23 @@ class TSPSolver:
 		return results
 
 	def greed_fancy(self, cities, numCities, best_cost, time_allowance=60.0):
-		fitness_list = []
-		results = {}
-		curr_city = random.choice(cities)
-		route = [curr_city]
-		free_cities = set(cities)
-		free_cities.remove(curr_city)
-		# print('start greedy')
-		while free_cities:
-			next_city = min(free_cities, key=lambda x: curr_city.costTo(x))
-			free_cities.remove(next_city)
-			route.append(next_city)
-			curr_city = next_city
+		num_solutions = 0
+		for city in cities: #Make sure that you return a non infinite solution
+			results = {}
+			curr_city = city
+			route = [curr_city]
+			free_cities = set(cities)
+			free_cities.remove(curr_city)
+			while free_cities:
+				next_city = min(free_cities, key=lambda x: curr_city.costTo(x))
+				free_cities.remove(next_city)
+				route.append(next_city)
+				curr_city = next_city
 
-		bssf = TSPSolution(route)
-		if bssf._costOfRoute() < best_cost:
-			best_fitness = bssf
-		fitness_list.append(bssf)
-		# print('finishing')
-		# end_time = time.time()
-		return bssf
+			num_solutions += 1
+			temp = TSPSolution(route)
+			if temp._costOfRoute() < best_cost:
+				bssf = temp
+				break
+
+		return bssf, num_solutions
