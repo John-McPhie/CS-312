@@ -163,12 +163,16 @@ class TSPSolver:
 	def greedy( self,time_allowance=60.0 ):
 		cities = self._scenario.getCities()
 		start_time = time.time()
-		s, num_solutions = self.greed_fancy(cities, len(cities), float('inf'))
+		s = self.greedy_fancy(cities[random.randint(0, len(cities)-1)])
+		initial = s
+		while s.cost == float('inf'):
+			s = self.greedy_fancy(cities[random.randint(0, len(cities)-1)])
+
 		end_time = time.time()
 		results = {}
 		results['cost'] = s.cost
 		results['time'] = end_time - start_time
-		results['count'] = num_solutions
+		results['count'] = 0
 		results['soln'] = s
 		results['max'] = None
 		results['total'] = None
@@ -260,18 +264,27 @@ class TSPSolver:
 	'''
 	def fancy( self,time_allowance=60.0 ):
 		random.seed(time.time())
-		T = 100000000
-		final_index = len(self._scenario.getCities())-1
-		num_solutions = 1
+		init = 100000000
+		T = init
+		cities = self._scenario.getCities()
+		final_index = len(cities) - 1
+		num_solutions = 0
+		greedies = set()
 
 		start_time = time.time()
-		greedy = self.greedy(time_allowance)
-		s = greedy['soln']
+		for city in cities: #Get a greedy solution starting from each city
+			greedies.add(self.greedy_fancy(city))
+
+		s = next(iter(greedies)) #get first one
 		bssf = s
 
-		for _ in range(1000):
+		for solution in greedies: #Run simulated annealing on each greedy solution
+			if solution.cost < bssf.cost:
+				num_solutions += 1
+				bssf = solution
+
 			while T > 0 and time.time() - start_time < time_allowance:
-				route = s.route.copy()
+				route = solution.route.copy()
 				#randomly choose a solution in the neighborhood.
 				index1 = random.randint(0, final_index)
 				index2 = random.randint(0, final_index)
@@ -284,7 +297,7 @@ class TSPSolver:
 					num_solutions += 1
 					if neighbor.cost < bssf.cost:
 						bssf = neighbor
-
+						T = init
 					diff = neighbor.cost - s.cost
 					if diff < 0:
 						s = neighbor
@@ -306,24 +319,17 @@ class TSPSolver:
 		results['pruned'] = None
 		return results
 
-	def greed_fancy(self, cities, numCities, best_cost, time_allowance=60.0):
-		num_solutions = 0
-		for city in cities: #Make sure that you return a non infinite solution
-			results = {}
-			curr_city = city
-			route = [curr_city]
-			free_cities = set(cities)
-			free_cities.remove(curr_city)
-			while free_cities:
-				next_city = min(free_cities, key=lambda x: curr_city.costTo(x))
-				free_cities.remove(next_city)
-				route.append(next_city)
-				curr_city = next_city
+	def greedy_fancy(self, city, time_allowance=60.0):
+		cities = self._scenario.getCities()
+		results = {}
+		curr_city = city
+		route = [curr_city]
+		free_cities = set(cities)
+		free_cities.remove(curr_city)
+		while free_cities:
+			next_city = min(free_cities, key=lambda x: curr_city.costTo(x))
+			free_cities.remove(next_city)
+			route.append(next_city)
+			curr_city = next_city
 
-			num_solutions += 1
-			temp = TSPSolution(route)
-			if temp._costOfRoute() < best_cost:
-				bssf = temp
-				break
-
-		return bssf, num_solutions
+		return TSPSolution(route)
