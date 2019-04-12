@@ -260,41 +260,47 @@ class TSPSolver:
 	'''
 	def fancy( self,time_allowance=60.0 ):
 		random.seed(time.time())
-		T = 100000
+		T = 100000000
 		final_index = len(self._scenario.getCities())-1
 		num_solutions = 1
 
 		start_time = time.time()
-		# s = self.defaultRandomTour()["soln"]#initial greedy?
-		s = self.greedy(time_allowance)['soln']
-		while T > 0 and time.time() - start_time < time_allowance:
-			route = s.route.copy()
-			#randomly choose a solution in the neighborhood.
-			index1 = random.randint(0, final_index)
-			index2 = random.randint(0, final_index)
-			temp = route[index1]
-			route[index1] = route[index2]
-			route[index2] = temp
-			neighbor = TSPSolution(route)
+		greedy = self.greedy(time_allowance)
+		s = greedy['soln']
+		bssf = s
 
-			if neighbor.cost != float('inf'):
-				num_solutions += 1
-				diff = neighbor.cost - s.cost
-				if diff < 0:
-					s = neighbor
-				else:
-					probability = math.exp(-diff/T)
-					if probability >= random.random():
+		for _ in range(1000):
+			while T > 0 and time.time() - start_time < time_allowance:
+				route = s.route.copy()
+				#randomly choose a solution in the neighborhood.
+				index1 = random.randint(0, final_index)
+				index2 = random.randint(0, final_index)
+				temp = route[index1]
+				route[index1] = route[index2]
+				route[index2] = temp
+				neighbor = TSPSolution(route)
+
+				if neighbor.cost != float('inf'):
+					num_solutions += 1
+					if neighbor.cost < bssf.cost:
+						bssf = neighbor
+
+					diff = neighbor.cost - s.cost
+					if diff < 0:
 						s = neighbor
-				T = T * .99 - .001 #I just experimented with this until is got better...
+					else:
+						probability = math.exp(-diff/T)
+						if probability > random.random():
+							s = neighbor
+					T = .99 * T - .000001 #I just experimented with this until is got better...
 
 		end_time = time.time()
 		system.notify("Done", "Fancy")
 		results = {}
-		results['cost'] = s.cost
+		results['cost'] = bssf.cost
 		results['time'] = end_time - start_time
 		results['count'] = num_solutions
-		results['soln'] = s
+		results['soln'] = bssf
 		results['max'] = None
 		results['total'] = None
 		results['pruned'] = None
